@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Maintenance agent · Pandita</title><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head><body>
+<header><div class="brand">P<span>ANDITA</span></div><div class="heading"><h1>Maintenance agent</h1><p>Chat, inspect its work, and follow the outputs.</p></div><span class="pill" id="connection">Connecting…</span></header>
+<div class="toolbar"><label for="sessions">Conversation</label><select id="sessions" aria-label="Conversation"></select><button id="new">New chat</button><span id="model"></span><button id="model-setup">Model setup</button><span id="runtime-version" class="small"></span><span id="operation" role="status" hidden>Loading…</span><span class="sample">Synthetic pump data · Local sample identity</span></div>
+<div id="error" role="alert" hidden></div><button id="retry" hidden>Retry same command</button>
+<main><section class="chat"><div class="section-title"><h2>Conversation</h2><span id="status" class="pill" role="status">Ready</span></div><div id="messages" role="log" aria-label="Conversation messages"></div>
+<div id="failure" role="alert" hidden></div>
+<div id="question" hidden><strong>Agent needs your input</strong><p id="question-text"></p></div>
+<div class="composer"><label for="message">Message the agent</label><textarea id="message" placeholder="Plan inspections for all pumps within a two-hour window…" rows="3"></textarea><div class="compose-actions"><span id="hint" role="status">assets.csv is ready in this conversation.</span><button id="cancel" class="quiet">Stop run</button><button id="send" class="primary">Send message</button></div></div>
+<div class="suggestions"><button data-prompt="Plan inspections for all pumps in assets.csv within a two-hour maintenance window. Use the maintenance-planning skill and ask me for missing crew information before planning.">Start the planning task</button><button data-prompt="Two technicians are available. Save both plan.md and schedule.json.">Two technicians</button><button data-prompt="Exclude P07 and P08. Keep other constraints unchanged. Update both plan.md and schedule.json.">Exclude two pumps</button></div></section>
+<aside><section><div class="section-title"><h2>Skills</h2><span id="skill-count" class="small"></span></div><div id="skills"></div></section>
+<section><div class="section-title"><h2>Activity</h2><span id="usage" class="small"></span></div><p class="muted small">Tool calls, results and skill reads from the actual run.</p><div id="activity" aria-label="Live activity"></div></section>
+<section><div class="section-title"><h2>Files & outputs</h2><span id="file-count" class="small"></span></div><div id="files"></div></section></aside></main>
+<dialog id="preview"><div class="section-title"><h2 id="preview-title">Output</h2><button id="close-preview" autofocus>Close</button></div><pre id="preview-content"></pre></dialog>
+<dialog id="setup-dialog"><div class="section-title"><h2>Model setup</h2><button id="close-setup">Close</button></div>
+<p id="setup-current"></p><p>Changes start a new chat. Finish or stop active conversations first. The endpoint is tested when you send a message.</p>
+<div class="setup-grid">
+<label>Preset<select id="model-preset"><option value="current">Current configuration</option></select></label>
+<label>Profile name<input id="profile-ref" autocomplete="off"></label>
+<label>Served model ID<input id="served-model" autocomplete="off" placeholder="Qwen/Qwen3.8-27B"></label>
+<label>vLLM / compatible endpoint<input id="model-endpoint" type="url" autocomplete="off" placeholder="https://vllm.example.com/v1"></label>
+</div>
+<p class="small">Use the exact model ID served by vLLM and include /v1. Remote endpoints require HTTPS. This sample runs in Docker: localhost refers to its container network, not your host.</p>
+<div class="setup-options"><label><input id="model-thinking" type="checkbox"> Enable thinking</label><span id="reasoning-policy" class="small"></span></div>
+<label>API key for this endpoint<input id="model-key" type="password" autocomplete="new-password" placeholder="Kept in memory; never included in downloaded profiles"></label>
+<div class="setup-options"><label><input id="reuse-key" type="checkbox"> Use current credential (same endpoint only)</label><label><input id="no-auth" type="checkbox"> Endpoint needs no authentication</label></div>
+<details><summary>Custom profile / advanced JSON</summary><p>Choose a preset as a base, edit the JSON, then load it into the form. Gemma and Qwen keep their respective reasoning rules. For another compatible model, omit execution; no family-specific reasoning is assumed.</p><textarea id="profile-json" rows="9" spellcheck="false"></textarea><div class="setup-options"><button id="load-profile-json">Load JSON into form</button><label>Import JSON<input id="import-profile" type="file" accept="application/json,.json"></label></div></details>
+<p id="setup-result" role="status"></p><div class="setup-options"><button id="export-profile">Download profile JSON</button><button id="apply-profile" class="primary">Apply &amp; start new chat</button></div>
+<p class="small">The key is sent only to this local setup service and your configured model endpoint. Applying does not send a model request. Export the non-secret JSON to keep or share your profile; re-enter credentials after restarting the sample.</p>
+</dialog>
+<footer>Planning only. No maintenance is performed or published. Model calls use your configured provider.</footer></body></html>

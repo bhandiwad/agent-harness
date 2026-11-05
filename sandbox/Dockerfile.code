@@ -1,0 +1,6 @@
+FROM python:3.12-slim
+COPY entry.py landlock.py /opt/executor/
+USER 65532:65532
+WORKDIR /workspace
+ENV PYTHONDONTWRITEBYTECODE=1
+ENTRYPOINT ["python", "-I", "/opt/executor/entry.py"]

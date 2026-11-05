@@ -1,0 +1,8 @@
+FROM python:3.12-slim
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/browsers
+RUN python -m pip install --no-cache-dir playwright==1.63.0 && playwright install --with-deps chromium
+COPY entry.py landlock.py browser_job.py /opt/executor/
+USER 65532:65532
+WORKDIR /workspace
+ENV PYTHONDONTWRITEBYTECODE=1
+ENTRYPOINT ["python", "-I", "/opt/executor/entry.py"]

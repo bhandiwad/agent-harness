@@ -1,0 +1,23 @@
+{
+  "tenant_id": "c0e94e74-edaf-4aae-bda6-ab4cb7564fc2",
+  "workspace_id": "8328b799-46fc-44a0-a153-a68179910658",
+  "issuer": "https://identity.example.invalid",
+  "audience": "pandita-agent-sandbox",
+  "jwks_file": "/etc/pandita/sandbox-jwks.json",
+  "policy_file": "/etc/pandita/sandbox-policy.csv",
+  "state_dir": "/var/lib/pandita-sandbox",
+  "docker_binary": "/usr/bin/docker",
+  "docker_host": "unix:///run/user/1000/docker.sock",
+  "runtime": "runsc",
+  "allow_standard_runtime": false,
+  "require_landlock": true,
+  "images": {
+    "shell": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "python": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "browser": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "max_seconds": 30,
+  "memory_mb": 512,
+  "pids": 128,
+  "concurrency": 2
+}

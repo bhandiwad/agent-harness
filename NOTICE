@@ -1,0 +1,4 @@
+Pandita Generic Agent Harness
+Derived from the AgentFabric harness repository, under Apache License 2.0 (LICENSE).
+The exported namespace is pandita_agent. No proprietary orchestration runtime is required.
+Third-party packages retain their own licenses and installed distribution metadata.

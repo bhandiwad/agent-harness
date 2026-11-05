@@ -1,0 +1,20 @@
+{
+  "model_ref": "gemma4-12b",
+  "model_name": "google/gemma-4-12B-it",
+  "base_url": "https://vllm.example.invalid/v1",
+  "api_key_env": "MODEL_API_KEY",
+  "protocol": "openai_chat",
+  "stream": true,
+  "request_timeout_seconds": 120,
+  "execution": {
+    "id": "gemma4-12b-thinking-v1",
+    "backend": "vllm",
+    "family": "gemma4",
+    "enable_thinking": true,
+    "sampling": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 64
+    }
+  }
+}

@@ -1,0 +1,21 @@
+name: pandita-agent
+x-service: &service
+  build: .
+  image: pandita-agent:0.4.0
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  volumes:
+    - ./config:/config:ro
+  env_file: [.env]
+services:
+  api:
+    <<: *service
+    command: [api, --config, /config/agent.json, --host, 0.0.0.0]
+    ports: ["127.0.0.1:8093:8093"]
+  worker:
+    <<: *service
+    env_file: [.env, .worker.env]
+    command: [worker, --config, /config/agent.json]

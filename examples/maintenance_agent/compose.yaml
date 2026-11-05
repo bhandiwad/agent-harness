@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: local-disposable-demo-only
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [demo]
+  demo:
+    image: ${HARNESS_IMAGE:-pandita-agent:0.4.0}
+    entrypoint: [python, /sample/demo.py]
+    user: "${DEMO_UID:-10001}:${DEMO_GID:-10001}"
+    environment:
+      MODEL_API_KEY: ${MODEL_API_KEY:?Set MODEL_API_KEY in your private model environment file}
+      DEMO_MODEL: ${DEMO_MODEL:-gpt-4.1-mini}
+      DEMO_MODEL_URL: ${DEMO_MODEL_URL:-https://api.openai.com/v1}
+      DEMO_ADMIN_DATABASE_URL: postgresql+psycopg://postgres:local-disposable-demo-only@127.0.0.1:5432/postgres
+      DEMO_OUTPUT: /outputs
+      DEMO_UI_PORT: ${DEMO_UI_PORT:-8094}
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - .:/sample:ro
+      - ../../config/model-profiles:/config/model-profiles:ro
+      - ${DEMO_OUTPUT_DIR:?Set DEMO_OUTPUT_DIR}:/outputs
+    depends_on:
+      db: {condition: service_healthy}
+    network_mode: service:db
+networks:
+  demo: {}

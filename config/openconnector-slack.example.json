@@ -1,0 +1,75 @@
+{
+  "tool": {
+    "name": "slack_post",
+    "version": "v1",
+    "owner": "internal-agents",
+    "transport": "openconnector",
+    "effect": "write",
+    "permission": "slack:post",
+    "approval_required": true,
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "enum": [
+            "confirmed",
+            "failed"
+          ]
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "ts": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ts",
+            "channelId"
+          ]
+        }
+      },
+      "required": [
+        "operation_id",
+        "status",
+        "result"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "binding": {
+    "kind": "openconnector",
+    "endpoint": "https://openconnector.example.invalid",
+    "action_id": "slack.post_message",
+    "subject_connections": {
+      "REPLACE_WITH_IDP_SUBJECT": "REPLACE_WITH_OPAQUE_SLACK_CONNECTION_ID"
+    },
+    "fixed_input": {
+      "channelId": "REPLACE_WITH_APPROVED_INTERNAL_CHANNEL"
+    }
+  },
+  "subject_token_files": {
+    "REPLACE_WITH_IDP_SUBJECT": "tokens/openconnector-user.token"
+  }
+}

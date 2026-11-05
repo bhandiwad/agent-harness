@@ -1,0 +1,23 @@
+{
+  "model_ref": "qwen38-27b",
+  "model_name": "Qwen/Qwen3.8-27B",
+  "base_url": "https://vllm.example.invalid/v1",
+  "api_key_env": "MODEL_API_KEY",
+  "protocol": "openai_chat",
+  "stream": true,
+  "request_timeout_seconds": 120,
+  "execution": {
+    "id": "qwen38-27b-thinking-v1",
+    "backend": "vllm",
+    "family": "qwen3_8",
+    "enable_thinking": true,
+    "sampling": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0.0,
+      "presence_penalty": 0.0,
+      "repetition_penalty": 1.0
+    }
+  }
+}

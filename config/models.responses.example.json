@@ -1,0 +1,10 @@
+{
+  "model_ref": "primary",
+  "model_name": "REPLACE_WITH_VERIFIED_RESPONSES_MODEL",
+  "base_url": "https://api.openai.com/v1",
+  "api_key_env": "MODEL_API_KEY",
+  "protocol": "openai_responses",
+  "stream": true,
+  "reasoning_context": "all_turns",
+  "compact_threshold": 32000
+}

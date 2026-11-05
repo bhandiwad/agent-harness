@@ -1,0 +1,21 @@
+{
+  "tenant_id": "c0e94e74-edaf-4aae-bda6-ab4cb7564fc2",
+  "workspace_id": "8328b799-46fc-44a0-a153-a68179910658",
+  "issuer": "https://identity.example.invalid",
+  "audience": "pandita-agent",
+  "jwks_file": "jwks.json",
+  "policy_file": "policy.csv",
+  "models": [{"model_ref": "primary", "model_name": "REPLACE_WITH_SERVING_MODEL", "base_url": "https://model.example.invalid/v1", "api_key_env": "MODEL_API_KEY", "protocol": "openai_chat"}],
+  "agents": [{
+    "id": "assistant",
+    "instructions": "Help with general tasks. Answer questions directly. Use connected context tools when source facts are needed. State missing information. Create private artifacts when requested. Never claim an external action succeeded without a receipt.",
+    "model": "primary",
+    "tools": [],
+    "native_tools": ["harness_calculate", "harness_time", "harness_list_files", "harness_read_file", "harness_search_files", "harness_write_file"],
+    "capacity": {"profile": "operator-verified", "context_tokens": 64000, "output_tokens": 4096},
+    "max_steps": 16,
+    "max_tokens": 65536,
+    "max_seconds": 300
+  }],
+  "connections": []
+}

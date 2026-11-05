@@ -1,0 +1,28 @@
+name: Standalone tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: fixture-only
+          POSTGRES_DB: harness_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      AGENT_TEST_DATABASE_URL: postgresql+psycopg://postgres:fixture-only@127.0.0.1/harness_test
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --no-deps -r requirements.lock
+      - run: python -m pip install '.[test]'
+      - run: python -m pytest -q tests examples/maintenance_agent/test_checks.py examples/maintenance_agent/test_model_config.py examples/maintenance_agent/test_ui.py

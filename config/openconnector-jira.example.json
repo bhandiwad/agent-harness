@@ -1,0 +1,70 @@
+{
+  "tool": {
+    "name": "jira_search",
+    "version": "v1",
+    "owner": "internal-agents",
+    "transport": "openconnector",
+    "effect": "read",
+    "permission": "jira:read",
+    "approval_required": false,
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "issues": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object"
+          }
+        },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "nextCursor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "nextCursor"
+          ]
+        }
+      },
+      "required": [
+        "issues",
+        "pagination"
+      ]
+    }
+  },
+  "binding": {
+    "kind": "openconnector",
+    "endpoint": "https://openconnector.example.invalid",
+    "action_id": "jira.search_issues",
+    "subject_connections": {
+      "REPLACE_WITH_IDP_SUBJECT": "REPLACE_WITH_OPAQUE_JIRA_CONNECTION_ID"
+    },
+    "fixed_input": {
+      "jql": "project = REPLACE_WITH_PROJECT ORDER BY updated DESC"
+    }
+  },
+  "subject_token_files": {
+    "REPLACE_WITH_IDP_SUBJECT": "tokens/openconnector-user.token"
+  }
+}

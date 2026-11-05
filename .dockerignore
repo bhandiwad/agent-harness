@@ -1,0 +1,7 @@
+.env
+.worker.env
+.migration.env
+.venv
+config
+__pycache__
+tests
