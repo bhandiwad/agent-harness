@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import logging
 import os
+import time
 from pathlib import Path
 
 import uvicorn
@@ -13,7 +14,7 @@ from pandita_agent.agent.runner import Runner
 from pandita_agent.agent.storage import Store, check_role, database, migrate
 
 
-async def work(runner, concurrency=4):
+async def work(runner, concurrency=4, maintenance=None):
     # Each running session holds one writer connection; keep headroom in the
     # eight-connection pool for record transactions and polling.
     limit = min(max(concurrency, 1), 4, runner.settings.max_active_sessions)
@@ -27,8 +28,17 @@ async def work(runner, concurrency=4):
             await asyncio.sleep(0.5)
             raise
 
+    last_maintenance = 0.0
     try:
         while True:
+            if maintenance and time.monotonic() - last_maintenance > 2:
+                try:
+                    await asyncio.to_thread(maintenance, runner)
+                except Exception:
+                    logging.getLogger(__name__).error(
+                        "Runtime maintenance unavailable; pending work retained."
+                    )
+                last_maintenance = time.monotonic()
             for ident, task in list(tasks.items()):
                 if task.done():
                     del tasks[ident]

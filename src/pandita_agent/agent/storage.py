@@ -40,13 +40,24 @@ def database(settings, environ):
 def migrate(engine):
     with engine.begin() as conn:
         conn.execute(text("SELECT pg_advisory_xact_lock(781931339)"))
-        exists = conn.execute(text("SELECT to_regclass('agent.schema_version')")).scalar()
+        exists = conn.execute(
+            text("SELECT to_regclass('agent.schema_version')")
+        ).scalar()
         if exists:
-            if conn.execute(text("SELECT version FROM agent.schema_version")).scalar_one() != 1:
-                raise ValueError("Use a fresh standalone database; Studio schemas are not compatible.")
+            if (
+                conn.execute(
+                    text("SELECT version FROM agent.schema_version")
+                ).scalar_one()
+                != 1
+            ):
+                raise ValueError(
+                    "Use a fresh standalone database; Studio schemas are not compatible."
+                )
             return
         conn.execute(text("CREATE SCHEMA agent"))
-        conn.execute(text("CREATE TABLE agent.schema_version (version integer PRIMARY KEY)"))
+        conn.execute(
+            text("CREATE TABLE agent.schema_version (version integer PRIMARY KEY)")
+        )
         conn.execute(text("INSERT INTO agent.schema_version VALUES (1)"))
         conn.execute(
             text("""CREATE TABLE agent.sessions (
@@ -96,16 +107,20 @@ def migrate(engine):
         )
 
 
-
 def check_role(engine):
     with engine.connect() as conn:
         if any(
             conn.execute(
-                text("SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user")
+                text(
+                    "SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user"
+                )
             ).one()
         ):
             raise ValueError("Runtime role cannot bypass row isolation.")
-        if conn.execute(text("SELECT version FROM agent.schema_version")).scalar_one() != 1:
+        if (
+            conn.execute(text("SELECT version FROM agent.schema_version")).scalar_one()
+            != 1
+        ):
             raise ValueError("Unsupported agent schema.")
         rows = conn.execute(
             text("""SELECT c.relrowsecurity,c.relforcerowsecurity,r.rolname=current_user
@@ -120,7 +135,10 @@ def check_role(engine):
 class Store:
     def __init__(self, engine, settings):
         self.engine, self.settings = engine, settings
-        self.scope = {"tenant": str(settings.tenant_id), "workspace": str(settings.workspace_id)}
+        self.scope = {
+            "tenant": str(settings.tenant_id),
+            "workspace": str(settings.workspace_id),
+        }
 
     @contextmanager
     def transaction(self):
@@ -139,7 +157,10 @@ class Store:
                 return self.get(session_id, conn)
         row = (
             conn.execute(
-                text("SELECT * FROM agent.sessions WHERE id=:id" + (" FOR UPDATE" if lock else "")),
+                text(
+                    "SELECT * FROM agent.sessions WHERE id=:id"
+                    + (" FOR UPDATE" if lock else "")
+                ),
                 {"id": session_id},
             )
             .mappings()
@@ -149,10 +170,13 @@ class Store:
             raise NotFound("Conversation not found.")
         return dict(row)
 
+    def visibility_clause(self):
+        return "TRUE"
+
     def list(self, owner=None, *, pending=False, viewer=None):
         with self.transaction() as conn:
             query = "SELECT id,owner,revision,state->>'title' AS title,state->>'status' AS status,updated_at FROM agent.sessions"
-            where = []
+            where = [self.visibility_clause()] if viewer is not None else []
             if owner is not None:
                 where.append("owner=:owner")
             if pending:
@@ -165,7 +189,11 @@ class Store:
                     text(
                         query
                         + (" WHERE " + " AND ".join(where) if where else "")
-                        + (" ORDER BY updated_at,id" if pending else " ORDER BY updated_at DESC,id DESC")
+                        + (
+                            " ORDER BY updated_at,id"
+                            if pending
+                            else " ORDER BY updated_at DESC,id DESC"
+                        )
                         + " LIMIT 100"
                     ),
                     {"owner": owner, "viewer": viewer},
@@ -180,14 +208,22 @@ class Store:
             text(
                 "UPDATE agent.sessions SET state=CAST(:state AS jsonb),revision=:revision,updated_at=clock_timestamp() WHERE id=:id"
             ),
-            {"id": row["id"], "state": canonical(row["state"]), "revision": row["revision"]},
+            {
+                "id": row["id"],
+                "state": canonical(row["state"]),
+                "revision": row["revision"],
+            },
         )
         self.event(conn, row, kind, actor, data)
         return row
 
-    def event(self, conn, row, kind, actor, data=None):
+    def usage_stamp(self, row, kind, data):
         from pandita_agent.agent.usage import stamp
-        data = stamp(self.settings, row, kind, data or {})
+
+        return stamp(self.settings, row, kind, data)
+
+    def event(self, conn, row, kind, actor, data=None):
+        data = self.usage_stamp(row, kind, data or {})
         conn.execute(
             text(
                 "INSERT INTO agent.events (tenant_id,workspace_id,session_id,revision,kind,actor,data) VALUES (:tenant,:workspace,:id,:revision,:kind,:actor,CAST(:data AS jsonb))"
@@ -204,10 +240,13 @@ class Store:
 
     def command(self, conn, command_id, digest, session_id):
         conn.execute(
-            text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"), {"key": str(command_id)}
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
+            {"key": str(command_id)},
         )
         prior = (
-            conn.execute(text("SELECT * FROM agent.commands WHERE id=:id"), {"id": command_id})
+            conn.execute(
+                text("SELECT * FROM agent.commands WHERE id=:id"), {"id": command_id}
+            )
             .mappings()
             .first()
         )
@@ -216,14 +255,32 @@ class Store:
                 raise Conflict("Command ID already used for different content.")
             return False
         conn.execute(
-            text("INSERT INTO agent.commands VALUES (:tenant,:workspace,:id,:session,:digest)"),
+            text(
+                "INSERT INTO agent.commands VALUES (:tenant,:workspace,:id,:session,:digest)"
+            ),
             {**self.scope, "id": command_id, "session": session_id, "digest": digest},
         )
         return True
 
-    def create(self, request, owner):
+    def create(self, request, owner, *, metadata=None):
         session_id = request.command_id
         identity = {"request": request.model_dump(mode="json"), "owner": owner}
+        metadata = dict(metadata or {})
+        if set(metadata) & {
+            "request",
+            "owner",
+            "title",
+            "agent_id",
+            "config_digest",
+            "status",
+            "history",
+            "evidence",
+            "memory",
+            "run",
+            "files",
+        }:
+            raise ValueError("Session metadata cannot replace runtime state.")
+        identity.update(metadata)
         digest = content_digest(identity)
         with self.transaction() as conn:
             if not self.command(conn, request.command_id, digest, session_id):
@@ -237,12 +294,18 @@ class Store:
                 "evidence": {"version": 1, "complete": True, "sources": []},
                 "memory": {},
                 "run": None,
+                **metadata,
             }
             conn.execute(
                 text(
                     "INSERT INTO agent.sessions (tenant_id,workspace_id,id,owner,revision,state) VALUES (:tenant,:workspace,:id,:owner,1,CAST(:state AS jsonb))"
                 ),
-                {**self.scope, "id": session_id, "owner": owner, "state": canonical(state)},
+                {
+                    **self.scope,
+                    "id": session_id,
+                    "owner": owner,
+                    "state": canonical(state),
+                },
             )
             row = self.get(session_id, conn)
             self.event(conn, row, "session.created", owner)

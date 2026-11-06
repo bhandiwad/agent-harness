@@ -45,3 +45,23 @@ A synthetic 4,001-element multiline JSON SSE event, measured for 15 iterations o
 - The deployment owns TLS ingress/rate limits, credentials, network policy, backups, retention, monitoring and multi-node capacity planning. Synchronous trusted completion checks must remain fast and free of I/O.
 - There is no automatic migration of AgentFabric/Studio installations. They remain on their existing implementation until their client/adapters are separately migrated.
 - Dependency scanning covers known Python advisories at scan time, not every container OS/browser vulnerability. Package builders need operator-controlled supply-chain and network policy.
+
+## AgentFabric integration — 6 November 2026
+
+Version 0.4.1 adds application-neutral subclass hooks for tool preparation,
+local tool handlers, specialist construction, context and receipt metadata;
+shared snapshot sanitization; transactional session metadata and directory
+visibility; usage stamping; and failure-isolated worker maintenance. No Studio
+imports, tables, routes or callback endpoints were added. Standalone deployment
+and its version 1 schema remain unchanged.
+
+The package environment guard now rejects cached images built against a
+superseded configured base. Missing code-service configuration raises the
+bounded configuration error before reading its endpoint.
+
+Verified in an isolated Python environment against a disposable PostgreSQL 17
+container: **204 passed, 6 skipped**, including actual API/worker subprocess
+restart, approvals, model wire fixtures and sample-agent checks. The six skipped
+checks require the opt-in real OCI sandbox configuration. Focused static checks
+passed. These are fixture and local integration results, not live model,
+connector, gVisor or production-load qualification.

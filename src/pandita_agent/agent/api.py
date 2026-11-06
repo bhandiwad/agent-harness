@@ -31,8 +31,27 @@ from pandita_agent.contracts import canonical
 from pandita_agent.runtime.auth import Access, Forbidden, Unauthorized
 
 
+def public_snapshot(row, authorize, user):
+    row = copy.deepcopy(row)
+    state = row.get("state", {})
+    state.pop("native_context", None)
+    try:
+        authorize(user, "workspace:read")
+    except Forbidden:
+        state["files"] = {
+            path: {key: value for key, value in file.items() if key != "content"}
+            for path, file in state.get("files", {}).items()
+        }
+    for frame in (state.get("run") or {}).get("frames", []):
+        frame.pop("provider_context", None)
+        frame["messages"] = visible(frame["messages"])
+    for turn in state.get("history", []):
+        turn["messages"] = visible(turn["messages"])
+    return row
+
+
 def create_app(runner):
-    app = FastAPI(title="Pandita generic agent harness", version="0.4.0")
+    app = FastAPI(title="Pandita generic agent harness", version="0.4.1")
     bearer = HTTPBearer(auto_error=False)
 
     def actor(
@@ -213,22 +232,7 @@ def create_app(runner):
         return {"sessions": runner.store.list(None if review else user, viewer=user)}
 
     def public(row, user):
-        row = copy.deepcopy(row)
-        state = row.get("state", {})
-        state.pop("native_context", None)
-        try:
-            runner.authorize(user, "workspace:read")
-        except Forbidden:
-            state["files"] = {
-                path: {key: value for key, value in file.items() if key != "content"}
-                for path, file in state.get("files", {}).items()
-            }
-        for frame in (state.get("run") or {}).get("frames", []):
-            frame.pop("provider_context", None)
-            frame["messages"] = visible(frame["messages"])
-        for turn in state.get("history", []):
-            turn["messages"] = visible(turn["messages"])
-        return row
+        return public_snapshot(row, runner.authorize, user)
 
     def request_schema(contract):
         return {

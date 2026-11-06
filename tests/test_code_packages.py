@@ -56,3 +56,15 @@ async def test_build_queue_retries_and_never_receives_source(tmp_path, monkeypat
     await envs.tasks[first['id']]
     assert envs.read(first['id'])['status'] == 'ready'
     assert len(calls) == 4
+
+
+def test_ready_package_image_from_superseded_base_cannot_execute(tmp_path):
+    settings = SimpleNamespace(state_dir=tmp_path, images={'shell': 'sha256:'+'a'*64})
+    environments = Environments(settings)
+    request = PackageRequest(language='python', packages={'humanize': '4.11.0'})
+    key = environments.key(request)
+    environments.write(key, {'id':key, 'status':'ready', 'request':request.model_dump(), 'image':'sha256:'+'b'*64})
+    project = CodeProject(language='python', entrypoint='agent.py', files={'agent.py':'source'}, packages=request.packages, environment=key)
+    settings.images['shell'] = 'sha256:'+'c'*64
+    with pytest.raises(ValueError, match='environment needs an update'):
+        environments.executor_settings(project)

@@ -48,7 +48,9 @@ def instruction_files(root, directory="."):
             raise ValueError("Instruction symlinks are unsupported.")
         name = path.relative_to(root).as_posix()
         if not path.exists():
-            files[name] = None  # Addition of a previously absent file also changes the pin.
+            files[name] = (
+                None  # Addition of a previously absent file also changes the pin.
+            )
             continue
         value = read_bounded(path, 32768).decode("utf-8")
         total += len(value.encode())
@@ -61,7 +63,9 @@ def instruction_files(root, directory="."):
 def instruction_digest(files):
     return content_digest(
         {
-            name: hashlib.sha256(value.encode()).hexdigest() if value is not None else None
+            name: hashlib.sha256(value.encode()).hexdigest()
+            if value is not None
+            else None
             for name, value in files.items()
         }
     )
@@ -72,7 +76,9 @@ def read_instructions(pin):
     if instruction_digest(files) != pin.digest:
         raise ValueError("Scoped instructions changed; repin and start a new session.")
     return "\n".join(
-        f"Project guidance ({name}):\n{value}" for name, value in files.items() if value is not None
+        f"Project guidance ({name}):\n{value}"
+        for name, value in files.items()
+        if value is not None
     )
 
 
@@ -95,9 +101,7 @@ class Capabilities:
                     if tool_name in connections:
                         authorize(actor, connections[tool_name].tool.permission)
                     else:
-                        from pandita_agent.agent.native_tools import NATIVE
-
-                        permission = NATIVE[tool_name]["permission"]
+                        permission = agent.native_definitions[tool_name]["permission"]
                         if permission:
                             authorize(actor, permission)
             except Forbidden:
@@ -128,7 +132,9 @@ class Capabilities:
         )
         if self.agent.skill_mode == "eager":
             return tuple(self.skills.values())
-        return self.catalog.activate(names, "Restore selected skills for this execution frame")
+        return self.catalog.activate(
+            names, "Restore selected skills for this execution frame"
+        )
 
     def select(self, names, reason):
         if self.agent.skill_mode != "on_demand":
@@ -139,18 +145,24 @@ class Capabilities:
                 "name": name,
                 "version": self.pins[name].version,
                 "digest": self.pins[name].digest,
-                "resources": [p for p in self.skills[name].files if not p.startswith("scripts/")],
+                "resources": [
+                    p for p in self.skills[name].files if not p.startswith("scripts/")
+                ],
             }
             for name in names
         ]
 
     def resource(self, frame, name, path):
         if name not in {skill.metadata.name for skill in self.active(frame)}:
-            raise ToolInputError("Select a permitted skill before reading its resources.")
+            raise ToolInputError(
+                "Select a permitted skill before reading its resources."
+            )
         if not safe_path(path) or path.startswith("scripts/"):
             raise ValueError("Skill resource path is not permitted.")
         if path not in self.skills[name].files:
-            available = [p for p in self.skills[name].files if not p.startswith("scripts/")]
+            available = [
+                p for p in self.skills[name].files if not p.startswith("scripts/")
+            ]
             raise ToolInputError(
                 "Resource not found. Available paths: " + ", ".join(available)[:400]
             )

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal
+from typing import ClassVar, Literal
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -64,6 +64,7 @@ class Skill(Contract):
 
 
 class Agent(Contract):
+    native_definitions: ClassVar[dict] = NATIVE
     team: tuple[TeamMember, ...] = Field(
         default=(), max_length=6, exclude_if=lambda v: not v
     )
@@ -88,7 +89,7 @@ class Agent(Contract):
 
     @model_validator(mode="after")
     def output_contract(self):
-        if not set(self.native_tools) <= NATIVE.keys():
+        if not set(self.native_tools) <= self.native_definitions.keys():
             raise ValueError("Unknown native tool.")
         if any(
             not set(skill.required_tools) <= set(self.tools) | set(self.native_tools)
@@ -209,8 +210,8 @@ class Settings(Contract):
         return content_digest(self.model_dump(mode="json"))
 
 
-def load_settings(path: Path):
-    settings = Settings.model_validate_json(read_bounded(path, 262144))
+def load_settings(path: Path, settings_type=Settings):
+    settings = settings_type.model_validate_json(read_bounded(path, 262144))
     base = path.resolve().parent
     return settings.model_copy(
         update={

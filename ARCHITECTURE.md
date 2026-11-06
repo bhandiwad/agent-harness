@@ -28,3 +28,29 @@ DataFusion stays pluggable. `POST /v1/context/access` uses an optional configure
 API and worker run independently, sharing only their dedicated PostgreSQL database and pinned configuration. Model credentials belong in the worker. Sandbox/code brokers are separately deployed operator services; application containers never receive a Docker socket. The default sandbox requires gVisor and Landlock. Explicit runc opt-in provides lower assurance and needs separate qualification.
 
 The original AgentFabric checkout was not modified by this extraction. It still uses its existing embedded package and Studio runtime. Switching that application to this repository requires a separate adapter migration; no live service has been redeployed here.
+
+## Application adapters
+
+The standalone runtime remains independently deployable and owns the execution
+loop, streamed transports, bounded code dispatch, completions, approval and
+reconciliation state machine, session transactions, and worker scheduling.
+Application repositories may subclass `Runner`, `Store`, `Agent`, and `Settings`.
+No application imports, schemas, or callbacks are required by this package.
+
+Trusted Python adapters can supply native tool declarations, specialist members,
+additional context, local tool dispatch, connector resolution/preparation, and
+receipt metadata. Connector preparation runs before approval and must durably pin
+any selected destination into the action digest before dispatch. External writes
+must continue through the core connected-tool approval and reconciliation path;
+local extension handlers must not bypass that path for external side effects.
+
+`Store.create(metadata=...)` atomically binds application metadata into command
+idempotency without allowing replacement of reserved runtime state. Application
+stores may specialize directory visibility and usage metadata. They retain their
+own schema migration and version verification; never run the standalone migrator
+against an application database. Optional worker maintenance callbacks are
+failure-isolated, as are individual sessions.
+
+Native declarations are a class-level registry on the typed agent contract and
+runner adapter, not a process-global mutation. Each application must test its
+adapter against the exact immutable dependency revision it installs.
