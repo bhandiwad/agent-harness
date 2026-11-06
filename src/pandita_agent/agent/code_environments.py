@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from pandita_agent.contracts import content_digest
+from pandita_agent.agent.code_contracts import PackageRequest
 
 
 class Environments:
@@ -121,4 +122,6 @@ class Environments:
         state = self.read(project.environment)
         if state['status'] != 'ready' or state.get('request') != {'language': project.language, 'packages': project.packages}:
             raise ValueError('Packages changed or their environment is unavailable. Rebuild packages and save the draft.')
+        if project.environment != self.key(PackageRequest(language=project.language, packages=project.packages)):
+            raise ValueError('This package environment needs an update. Choose Build Packages and save the draft before running it.')
         return self.settings.model_copy(update={'images': {**self.settings.images, 'shell': state['image']}})

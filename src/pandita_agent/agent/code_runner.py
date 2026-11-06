@@ -317,11 +317,10 @@ async def step(runner, row, agent, root):
 
 async def environment_request(method, key="", body=None):
     """Small authenticated control requests; the build itself runs asynchronously."""
-    ModelBinding.explicit_endpoint(os.environ["AGENT_CODE_URL"])
-    import ssl
-
     if not available():
         raise CodeError("Code execution is not configured for this workspace.")
+    ModelBinding.explicit_endpoint(os.environ["AGENT_CODE_URL"])
+    import ssl
     async with httpx2.AsyncClient(
         verify=ssl.create_default_context(cafile=os.environ.get("AGENT_CODE_CA")),
         trust_env=False,
