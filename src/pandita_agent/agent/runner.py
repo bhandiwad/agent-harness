@@ -707,10 +707,11 @@ class Runner:
                     uncertain = (latest["run"].get("inflight") or {}).get(
                         "kind"
                     ) == "write"
+                    actionable = isinstance(exc, (BudgetExceeded, CodeError))
                     self.commit(
                         session_id,
                         "run.failed",
-                        lambda s, uncertain=uncertain, detail=detail, actionable=isinstance(exc, (BudgetExceeded, CodeError)): (
+                        lambda s, uncertain=uncertain, detail=detail, actionable=actionable: (
                             s.update(
                                 status="outcome_unknown" if uncertain else "failed",
                                 error=detail if actionable else "Run stopped. Review its activity and retry when the issue is resolved.",
