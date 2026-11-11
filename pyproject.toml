@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pandita-agent"
-version = "0.6.0"
+version = "0.6.1"
 description = "Independent generic agent sessions, controlled tools and durable approvals"
 requires-python = ">=3.12,<3.14"
 dependencies = ["pydantic>=2.12,<3", "httpx2>=2,<3", "fastapi>=0.130,<1", "uvicorn>=0.40,<1", "SQLAlchemy>=2.0,<3", "psycopg[binary]>=3.2,<4", "PyJWT[crypto]>=2.10,<3", "casbin>=1.43,<2", "jsonschema>=4.25,<5", "PyYAML>=6,<7"]

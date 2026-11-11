@@ -693,8 +693,8 @@ class Runner:
                         else:
                             await self.model_step(row, agent, root)
                 except Exception as exc:
-                    from pandita_agent.agent.code_runner import CodeError
                     from pandita_agent.agent.budgets import BudgetExceeded
+                    from pandita_agent.agent.code_runner import CodeError
 
                     detail = (
                         str(exc)[:2000]
@@ -710,10 +710,10 @@ class Runner:
                     self.commit(
                         session_id,
                         "run.failed",
-                        lambda s, uncertain=uncertain, detail=detail, budget=isinstance(exc, BudgetExceeded): (
+                        lambda s, uncertain=uncertain, detail=detail, actionable=isinstance(exc, (BudgetExceeded, CodeError)): (
                             s.update(
                                 status="outcome_unknown" if uncertain else "failed",
-                                error=detail if budget else "Run stopped. Review its activity and retry when the issue is resolved.",
+                                error=detail if actionable else "Run stopped. Review its activity and retry when the issue is resolved.",
                             ),
                             s["run"].update(code_error=detail)
                             if self.agents[s["run"]["frames"][-1]["agent"]].code

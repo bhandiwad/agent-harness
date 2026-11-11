@@ -11,8 +11,8 @@ import httpx2
 
 from pandita_agent.agent.native_tools import write_file
 from pandita_agent.agent.storage import Conflict
-from pandita_agent.contracts import content_digest
 from pandita_agent.bindings import ModelBinding
+from pandita_agent.contracts import content_digest
 from pandita_agent.governance.context import token_upper_bound
 
 
@@ -61,20 +61,31 @@ async def execute(project, message, replay, scope, operation):
         # Only isolated, network-disabled computation is retried. Tool/model calls
         # are resolved by the harness after this step and replayed unchanged.
         for attempt in range(2):
-            async with client.stream(
-                "POST",
-                os.environ["AGENT_CODE_URL"] + "/v1/code",
-                headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
-                json={
-                    "project": project.model_dump(mode="json"),
-                    "input": message,
-                    "replay": replay,
-                    "scope": scope,
-                    "operation_id": operation if attempt == 0 else str(uuid4()),
-                },
-            ) as response:
-                response.raise_for_status()
-                value = await bounded_json(response, 98304)
+            operation_id = operation if attempt == 0 else str(uuid4())
+            # The broker rejects 429 before reserving or executing a job. Preserve
+            # its operation ID while waiting; other HTTP/transport failures are
+            # not admission refusals and must not enter this retry path.
+            for admission in range(6):
+                async with client.stream(
+                    "POST",
+                    os.environ["AGENT_CODE_URL"] + "/v1/code",
+                    headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
+                    json={
+                        "project": project.model_dump(mode="json"),
+                        "input": message,
+                        "replay": replay,
+                        "scope": scope,
+                        "operation_id": operation_id,
+                    },
+                ) as response:
+                    busy = response.status_code == 429
+                    if not busy:
+                        response.raise_for_status()
+                        value = await bounded_json(response, 98304)
+                        break
+                if admission == 5:
+                    raise CodeError("The code service is busy. Wait for another run to finish, then retry.")
+                await asyncio.sleep(0.25 * 2 ** admission)
             if value.get("status") != "unknown" or attempt:
                 break
 
@@ -356,20 +367,19 @@ async def environment_request(method, key="", body=None):
         trust_env=False,
         follow_redirects=False,
         timeout=8,
-    ) as client:
-        async with client.stream(
-            method,
-            os.environ["AGENT_CODE_URL"]
-            + "/v1/environments"
-            + ("/" + key if key else ""),
-            headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
-            json=body,
-        ) as response:
-            if response.status_code >= 400:
-                raise CodeError(
-                    "Package build service is unavailable. Check packages and retry."
-                )
-            return await bounded_json(response, 65536)
+    ) as client, client.stream(
+        method,
+        os.environ["AGENT_CODE_URL"]
+        + "/v1/environments"
+        + ("/" + key if key else ""),
+        headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
+        json=body,
+    ) as response:
+        if response.status_code >= 400:
+            raise CodeError(
+                "Package build service is unavailable. Check packages and retry."
+            )
+        return await bounded_json(response, 65536)
 
 
 async def bounded_json(response, limit):
