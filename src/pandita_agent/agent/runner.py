@@ -934,7 +934,11 @@ class Runner:
             if not isinstance(checked, CompletionResult):
                 raise ValueError("Completion check returned an invalid result.")
             issues.extend(checked.bounded().issues)
-        return issues
+        return issues or self.completion_extension(state, agent, answer, actor)
+
+    def completion_extension(self, state, agent, answer, actor):
+        """Application-local validation after core completion checks have passed."""
+        return []
 
     def finish_answer(self, state, answer):
         run = state["run"]

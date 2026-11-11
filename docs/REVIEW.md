@@ -65,3 +65,14 @@ restart, approvals, model wire fixtures and sample-agent checks. The six skipped
 checks require the opt-in real OCI sandbox configuration. Focused static checks
 passed. These are fixture and local integration results, not live model,
 connector, gVisor or production-load qualification.
+
+## Nested Teams, Version 0.5.0
+
+Opt-in recursive sequential handoffs retain persisted frames, shared budgets and
+per-child access checks. Legacy configuration serialization is unchanged. Tests
+cover denial before child dispatch and restart after a nested leaf commits without
+repeating that leaf. The completion extension runs after shared schema checks.
+
+Validation: 191 passed, 6 real-OCI checks skipped (no qualification config).
+The database was an empty disposable local PostgreSQL instance. These checks do
+not qualify external services, production isolation or parallel team execution.

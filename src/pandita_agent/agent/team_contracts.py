@@ -7,6 +7,10 @@ from pandita_agent.contracts import Contract
 
 
 class TeamMember(Contract):
+    model_ref: str = Field(default="", max_length=128, exclude_if=lambda v: not v)
+    team: tuple["TeamMember", ...] = Field(
+        default=(), max_length=6, exclude_if=lambda v: not v
+    )
     name: str = Field(min_length=1, max_length=100)
     instructions: str = Field(min_length=1, max_length=4096)
     tools: tuple[str, ...] = Field(default=(), max_length=10)

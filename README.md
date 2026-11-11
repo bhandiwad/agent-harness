@@ -83,3 +83,14 @@ Checks run synchronously in the trusted application worker and must be fast, det
 The harness does not semantically compress or rewrite the retained user requests. They remain ordered data for the root agent; applications can also pin structured facts through the existing memory API. This preserves inputs, not a guarantee that every model will interpret them correctly. Large retained requests can exhaust a small model context, which fails explicitly instead of silently deleting constraints.
 
 Application integration and source-access boundaries: [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Nested Sequential Teams
+
+Opt in with `team_execution: "nested"`. Members may contain teams and select a
+configured `model_ref`; absent values inherit the parent model. Calls share the
+root's token, time and step limits. Up to three nested levels and 24 total members
+are accepted. Each handoff rechecks the child permission and persists its frame.
+Existing configurations retain legacy execution and their serialization digest.
+Applications may validate or materialize output in `completion_extension`, invoked
+only after core schema and configured completion checks pass. The execution loop
+and approval state machine remain shared.

@@ -64,6 +64,9 @@ class Skill(Contract):
 
 
 class Agent(Contract):
+    team_execution: Literal["legacy", "nested"] = Field(
+        default="legacy", exclude_if=lambda v: v == "legacy"
+    )
     native_definitions: ClassVar[dict] = NATIVE
     team: tuple[TeamMember, ...] = Field(
         default=(), max_length=6, exclude_if=lambda v: not v
@@ -169,10 +172,28 @@ class Settings(Contract):
             or len(tools) != len(self.connections)
         ):
             raise ValueError("Catalog identifiers must be unique.")
-        generated = [
-            agent.id + "_s" + str(i)
+        from pandita_agent.agent.teams import walk_members
+
+        all_members = [
+            (agent, path, member)
             for agent in self.agents
-            for i in range(len(agent.team))
+            for path, member in walk_members(agent)
+        ]
+        if any(
+            sum(root is agent for root, _, _ in all_members) > 24
+            for agent in self.agents
+        ):
+            raise ValueError("A team supports at most 24 members in total.")
+        for root, _, member in all_members:
+            if member.team and root.team_execution != "nested":
+                raise ValueError("Nested teams require nested execution mode.")
+            if member.model_ref and member.model_ref not in models:
+                raise ValueError("A specialist references an unconfigured model.")
+            if not set(member.tools) <= tools:
+                raise ValueError("A specialist references an unconfigured tool.")
+        generated = [
+            root.id + "".join("_s" + str(i) for i in path)
+            for root, path, _ in all_members
         ]
         if len(set(generated)) != len(generated) or set(generated) & agents:
             raise ValueError(
