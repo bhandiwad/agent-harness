@@ -58,6 +58,32 @@ Restarts preserve conversation, pending decisions, plans, memory, workspace and 
 
 See `NATIVE_TOOLS.md` for the native/extension boundary and `COMPARISON.md` for the documented OpenAI/Claude comparison and remaining gaps.
 
+## Workspace Builder Runtime (0.6.0)
+
+Optional `budgets` settings provide USD run, agent/month and workspace/month caps
+and model-reference price tables. The immutable event ledger reserves estimated
+input/output cost under a workspace transaction lock before model dispatch,
+including code and child-agent calls. Completion uses the reserved price snapshot;
+uncertain attempts retain their reservation. Unpriced usage blocks an applicable
+monetary allowance. Calendar months use UTC. This meters configured model prices,
+not external tool charges or provider invoices. Applications may supply a policy
+through `Store.budget_policy(conn)` and stable `source_key` metering identity.
+
+Plans accept legacy strings or `{title, status}` steps. Responses profiles can
+explicitly set `reasoning_effort`; supported values must be qualified with the
+chosen provider. Existing optional native compaction remains operator-configured.
+
+`computation: true` enables model-selected Python analysis using the existing
+isolated code broker. It has no model/tool callbacks, network or credentials;
+inputs and text outputs are bounded. Data-only `.chart.json` artifacts contain
+`title`, `labels`, and `series` (`name`, numeric `values`), never executable markup.
+The authenticated broker readiness endpoint reports its exact workspace scope.
+
+Every model path inherits runtime and configured safety instructions. Fixed
+credential-pattern checks and optional restricted text/email rules apply to
+returned text, generated files and external write arguments. These are bounded
+checks, not comprehensive PII detection or a prompt-injection prevention guarantee.
+
 ## Optional completion checks (0.3.2)
 
 Configure `Agent(completion_check="my-check-v1", ...)` and register that exact name in your trusted worker:

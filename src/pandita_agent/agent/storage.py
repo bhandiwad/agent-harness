@@ -222,8 +222,14 @@ class Store:
 
         return stamp(self.settings, row, kind, data)
 
+    def budget_policy(self, conn):
+        return self.settings.budgets
+
     def event(self, conn, row, kind, actor, data=None):
         data = self.usage_stamp(row, kind, data or {})
+        from pandita_agent.agent.budgets import apply
+
+        data = apply(self, conn, row, kind, data)
         conn.execute(
             text(
                 "INSERT INTO agent.events (tenant_id,workspace_id,session_id,revision,kind,actor,data) VALUES (:tenant,:workspace,:id,:revision,:kind,:actor,CAST(:data AS jsonb))"

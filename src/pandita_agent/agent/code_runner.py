@@ -24,6 +24,30 @@ def available():
     return bool(os.environ.get("AGENT_CODE_URL") and os.environ.get("AGENT_CODE_TOKEN"))
 
 
+def ready(settings):
+    """Read-only readiness probe; configuration presence alone is not readiness."""
+    if not available():
+        return False
+    import ssl
+    try:
+        ModelBinding.explicit_endpoint(os.environ["AGENT_CODE_URL"])
+        with httpx2.Client(verify=ssl.create_default_context(cafile=os.environ.get("AGENT_CODE_CA")),
+                          trust_env=False, follow_redirects=False, timeout=3) as client:
+            with client.stream("GET", os.environ["AGENT_CODE_URL"] + "/v1/capabilities",
+                               headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]}) as response:
+                if response.status_code != 200:
+                    return False
+                raw = bytearray()
+                for chunk in response.iter_bytes():
+                    raw.extend(chunk)
+                    if len(raw) > 4096:
+                        return False
+                data = json.loads(raw)
+        return data.get("tenant_id") == str(settings.tenant_id) and data.get("workspace_id") == str(settings.workspace_id) and data.get("network") == "none" and "python" in data.get("languages", [])
+    except (OSError, ValueError, httpx2.HTTPError):
+        return False
+
+
 async def execute(project, message, replay, scope, operation):
     if not available():
         raise CodeError("Code execution is not configured for this workspace.")
@@ -175,6 +199,8 @@ async def step(runner, row, agent, root):
             for path, content in files.items():
                 if not isinstance(content, str):
                     raise CodeError("File content must be text.")
+                if runner.output_issues(content):
+                    raise CodeError("An output file violates workspace safety policy.")
                 prior = staged.get("files", {}).get(path)
                 write_file(staged, path, content, prior["digest"] if prior else None)
             issues = runner.completion_issues(staged, agent, answer, row["owner"])
@@ -204,8 +230,9 @@ async def step(runner, row, agent, root):
         if not isinstance(prompt, str) or not 1 <= len(prompt) <= 32768:
             raise CodeError("ctx.generate requires a prompt within 32 KB.")
         model = runner.models[agent.model]
+        instructions = runner.base_instructions(row, agent)
         estimate = token_upper_bound(
-            {"instructions": agent.instructions, "prompt": prompt}
+            {"instructions": instructions, "prompt": prompt}
         )
         remaining = root.max_tokens - run["input_tokens"] - run["output_tokens"]
         max_output = min(agent.capacity.output_tokens, remaining - estimate)
@@ -220,7 +247,10 @@ async def step(runner, row, agent, root):
             if guarded(s):
                 s["run"]["inflight"] = {"kind": "model"}
 
-        current = runner.commit(sid, "code.model_started", model_reserve)
+        current = runner.commit(sid, "code.model_started", model_reserve, {
+            "agent": agent.id, "model_ref": model.model_ref,
+            "input_token_bound": estimate, "output_token_limit": max_output,
+        })
         if current["state"]["status"] == "cancelled":
             return
         timeout = min(
@@ -233,7 +263,7 @@ async def step(runner, row, agent, root):
         async with asyncio.timeout(timeout):
             answer = await runner.provider.generate(
                 model,
-                agent.instructions,
+                instructions,
                 [{"role": "user", "content": prompt}],
                 [],
                 max_output,
