@@ -143,3 +143,39 @@ async def test_blocked_final_content_is_not_exposed_as_rejected_draft(store):
     state = store.get(row["id"])["state"]
     assert state["status"] == "completed"
     assert "BEGIN PRIVATE" not in json.dumps(state)
+
+
+@pytest.mark.parametrize("diagnostic, visible", [
+    ("name 'ctx' is not defined", True),
+    ("string indices must be integers, not 'str'", True),
+    ("x" * 2100, True),
+    ("x" * 2100 + "-----BEGIN PRIVATE KEY-----", False),
+])
+async def test_analysis_error_feedback_is_bounded_safe_and_allows_correction(
+    store, monkeypatch, diagnostic, visible
+):
+    store.settings = store.settings.model_copy(update={"agents": tuple(
+        a.model_copy(update={"computation": True}) for a in store.settings.agents
+    )})
+    results = iter([
+        {"error": diagnostic, "files": {"partial.txt": "must not persist"}},
+        {"done": True, "answer": "Total 0", "files": {"result.txt": "0"}},
+    ])
+    async def execute(*args):
+        return next(results)
+    monkeypatch.setattr("pandita_agent.agent.code_runner.execute", execute)
+    compute = call("harness_compute", code="def run(input, ctx): return '0'", files=[], data="0")
+    model = Model(compute, compute, "Total 0")
+    runner = Runner(store, model, authorize=lambda *args: None)
+    row = new(runner)
+    send(runner, row)
+    await runner.tick(row["id"])
+    feedback = json.loads(model.requests[1]["messages"][-1]["content"])
+    assert ("diagnostic" in feedback) == visible
+    if visible:
+        assert feedback["diagnostic"] == diagnostic[:2000]
+    state = store.get(row["id"])["state"]
+    assert state["status"] == "completed"
+    assert "partial.txt" not in state["files"]
+    assert state["files"]["result.txt"]["content"] == "0"
+    assert "BEGIN PRIVATE" not in json.dumps(model.requests)

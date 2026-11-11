@@ -12,7 +12,7 @@ from pandita_agent.contracts import canonical
 from pandita_agent.governance.tools import ToolBlocked
 
 DEFINITION = {
-    "description": "Run private Python analysis in an isolated, network-disabled environment. Define run(input, ctx), returning text; input is JSON with the selected files and supplied data. Use standard libraries (csv, json, statistics, math). ctx.write_file saves bounded text outputs. For a chart write a .chart.json file: {title, labels:[strings], series:[{name, values:[numbers]}]}. No model calls, connected tools, credentials, package installs or external actions are available here.",
+    "description": "Run private Python analysis in an isolated, network-disabled environment. Supply a complete module defining run(input, ctx), returning text. input is a JSON STRING: first parse payload = json.loads(input). payload['data'] is supplied text; payload['files'] maps selected paths to their text contents, not disk paths. ctx exists only inside run. Example: import json\ndef run(input, ctx):\n    payload = json.loads(input)\n    ctx.write_file('result.txt', payload['data'])\n    return 'Saved result.txt'\nUse standard libraries (csv, json, statistics, math). ctx.write_file saves bounded text outputs. For a chart write a .chart.json file: {title, labels:[strings], series:[{name, values:[numbers]}]}. Correct reported Python errors and retry within the run budget. No model calls, connected tools, credentials, package installs or external actions are available here.",
     "schema": {
         "type": "object",
         "properties": {
@@ -82,11 +82,17 @@ async def execute(runner, row, agent, arguments, commit):
         state["run"]["inflight"] = None
         state["run"]["elapsed"] += time.monotonic() - started
         if not isinstance(result, dict) or result.get("done") is not True:
+            feedback = {
+                "error": "Analysis did not complete. Check the Python code. Only local calculation and text-file outputs are allowed."
+            }
+            diagnostic = result.get("error") if isinstance(result, dict) else None
+            # Sandbox code has no host credentials. Still apply workspace output
+            # policy to the entire diagnostic before bounding model-visible text.
+            if isinstance(diagnostic, str) and not runner.output_issues(diagnostic):
+                feedback["diagnostic"] = diagnostic[:2000]
             runner.result(
                 state,
-                {
-                    "error": "Analysis did not complete. Check the Python code. Only local calculation and text-file outputs are allowed."
-                },
+                feedback,
             )
             return
         answer, outputs = result.get("answer"), result.get("files", {})
