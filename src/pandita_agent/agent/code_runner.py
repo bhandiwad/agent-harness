@@ -11,8 +11,8 @@ import httpx2
 
 from pandita_agent.agent.native_tools import write_file
 from pandita_agent.agent.storage import Conflict
-from pandita_agent.contracts import content_digest
 from pandita_agent.bindings import ModelBinding
+from pandita_agent.contracts import content_digest
 from pandita_agent.governance.context import token_upper_bound
 
 
@@ -22,6 +22,30 @@ class CodeError(ValueError):
 
 def available():
     return bool(os.environ.get("AGENT_CODE_URL") and os.environ.get("AGENT_CODE_TOKEN"))
+
+
+def ready(settings):
+    """Read-only readiness probe; configuration presence alone is not readiness."""
+    if not available():
+        return False
+    import ssl
+    try:
+        ModelBinding.explicit_endpoint(os.environ["AGENT_CODE_URL"])
+        with httpx2.Client(verify=ssl.create_default_context(cafile=os.environ.get("AGENT_CODE_CA")),
+                          trust_env=False, follow_redirects=False, timeout=3) as client:
+            with client.stream("GET", os.environ["AGENT_CODE_URL"] + "/v1/capabilities",
+                               headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]}) as response:
+                if response.status_code != 200:
+                    return False
+                raw = bytearray()
+                for chunk in response.iter_bytes():
+                    raw.extend(chunk)
+                    if len(raw) > 4096:
+                        return False
+                data = json.loads(raw)
+        return data.get("tenant_id") == str(settings.tenant_id) and data.get("workspace_id") == str(settings.workspace_id) and data.get("network") == "none" and "python" in data.get("languages", [])
+    except (OSError, ValueError, httpx2.HTTPError):
+        return False
 
 
 async def execute(project, message, replay, scope, operation):
@@ -37,20 +61,31 @@ async def execute(project, message, replay, scope, operation):
         # Only isolated, network-disabled computation is retried. Tool/model calls
         # are resolved by the harness after this step and replayed unchanged.
         for attempt in range(2):
-            async with client.stream(
-                "POST",
-                os.environ["AGENT_CODE_URL"] + "/v1/code",
-                headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
-                json={
-                    "project": project.model_dump(mode="json"),
-                    "input": message,
-                    "replay": replay,
-                    "scope": scope,
-                    "operation_id": operation if attempt == 0 else str(uuid4()),
-                },
-            ) as response:
-                response.raise_for_status()
-                value = await bounded_json(response, 98304)
+            operation_id = operation if attempt == 0 else str(uuid4())
+            # The broker rejects 429 before reserving or executing a job. Preserve
+            # its operation ID while waiting; other HTTP/transport failures are
+            # not admission refusals and must not enter this retry path.
+            for admission in range(6):
+                async with client.stream(
+                    "POST",
+                    os.environ["AGENT_CODE_URL"] + "/v1/code",
+                    headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
+                    json={
+                        "project": project.model_dump(mode="json"),
+                        "input": message,
+                        "replay": replay,
+                        "scope": scope,
+                        "operation_id": operation_id,
+                    },
+                ) as response:
+                    busy = response.status_code == 429
+                    if not busy:
+                        response.raise_for_status()
+                        value = await bounded_json(response, 98304)
+                        break
+                if admission == 5:
+                    raise CodeError("The code service is busy. Wait for another run to finish, then retry.")
+                await asyncio.sleep(0.25 * 2 ** admission)
             if value.get("status") != "unknown" or attempt:
                 break
 
@@ -175,6 +210,8 @@ async def step(runner, row, agent, root):
             for path, content in files.items():
                 if not isinstance(content, str):
                     raise CodeError("File content must be text.")
+                if runner.output_issues(content):
+                    raise CodeError("An output file violates workspace safety policy.")
                 prior = staged.get("files", {}).get(path)
                 write_file(staged, path, content, prior["digest"] if prior else None)
             issues = runner.completion_issues(staged, agent, answer, row["owner"])
@@ -204,8 +241,9 @@ async def step(runner, row, agent, root):
         if not isinstance(prompt, str) or not 1 <= len(prompt) <= 32768:
             raise CodeError("ctx.generate requires a prompt within 32 KB.")
         model = runner.models[agent.model]
+        instructions = runner.base_instructions(row, agent)
         estimate = token_upper_bound(
-            {"instructions": agent.instructions, "prompt": prompt}
+            {"instructions": instructions, "prompt": prompt}
         )
         remaining = root.max_tokens - run["input_tokens"] - run["output_tokens"]
         max_output = min(agent.capacity.output_tokens, remaining - estimate)
@@ -220,7 +258,10 @@ async def step(runner, row, agent, root):
             if guarded(s):
                 s["run"]["inflight"] = {"kind": "model"}
 
-        current = runner.commit(sid, "code.model_started", model_reserve)
+        current = runner.commit(sid, "code.model_started", model_reserve, {
+            "agent": agent.id, "model_ref": model.model_ref,
+            "input_token_bound": estimate, "output_token_limit": max_output,
+        })
         if current["state"]["status"] == "cancelled":
             return
         timeout = min(
@@ -233,7 +274,7 @@ async def step(runner, row, agent, root):
         async with asyncio.timeout(timeout):
             answer = await runner.provider.generate(
                 model,
-                agent.instructions,
+                instructions,
                 [{"role": "user", "content": prompt}],
                 [],
                 max_output,
@@ -326,20 +367,19 @@ async def environment_request(method, key="", body=None):
         trust_env=False,
         follow_redirects=False,
         timeout=8,
-    ) as client:
-        async with client.stream(
-            method,
-            os.environ["AGENT_CODE_URL"]
-            + "/v1/environments"
-            + ("/" + key if key else ""),
-            headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
-            json=body,
-        ) as response:
-            if response.status_code >= 400:
-                raise CodeError(
-                    "Package build service is unavailable. Check packages and retry."
-                )
-            return await bounded_json(response, 65536)
+    ) as client, client.stream(
+        method,
+        os.environ["AGENT_CODE_URL"]
+        + "/v1/environments"
+        + ("/" + key if key else ""),
+        headers={"Authorization": "Bearer " + os.environ["AGENT_CODE_TOKEN"]},
+        json=body,
+    ) as response:
+        if response.status_code >= 400:
+            raise CodeError(
+                "Package build service is unavailable. Check packages and retry."
+            )
+        return await bounded_json(response, 65536)
 
 
 async def bounded_json(response, limit):
