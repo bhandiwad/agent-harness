@@ -76,3 +76,29 @@ repeating that leaf. The completion extension runs after shared schema checks.
 Validation: 191 passed, 6 real-OCI checks skipped (no qualification config).
 The database was an empty disposable local PostgreSQL instance. These checks do
 not qualify external services, production isolation or parallel team execution.
+
+## Main-Branch Release Review — 13 November 2026
+
+Promote the existing 0.6.2 integration release to `main`, which was still on
+0.4.1. Reviewed nested sequential teams and restart recovery, model-cost
+reservations and retained unknown holds, deterministic output checks, isolated
+analysis/file validation, and bounded retries limited to explicit pre-execution
+429 refusals. Application authorization, schemas and connectors remain outside
+the standalone distribution. No blocking issue was found in this scoped review;
+this is not a new penetration test or production qualification.
+
+Corrected the API's stale 0.6.0 metadata to use the installed `pandita-agent`
+package version, with the API/schema boundary regression checking that identity.
+The package remains 0.6.2; this is repository release promotion, not a package
+registry publication or a change to any application's immutable dependency pin.
+
+Fresh local checks: **228 passed, 6 skipped in 29.30 seconds**, using the complete
+CI test selection (tests plus maintenance-example checks/model setup/UI), a new
+empty disposable PostgreSQL 17 container, and an explicit fixture-only process
+environment. Tests include real API/worker subprocesses with synthetic model
+and tool endpoints. The six skipped tests require `AGENT_SANDBOX_TEST_CONFIG`;
+real OCI/gVisor isolation and live Qwen/Gemma quality/performance were not tested
+in this release pass. `ruff check --select F,E9` and `git diff --check` passed.
+A wheel built successfully from a temporary source copy; no running runtime or
+demo environment was installed into or restarted. GitHub PR/merge evidence and
+AgentFabric's unchanged pin are recorded in AgentFabric's existing handover.

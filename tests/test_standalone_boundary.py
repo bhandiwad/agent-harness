@@ -1,6 +1,7 @@
 """Fail if the runtime gains an application dependency or Studio control-plane API."""
 
 import ast
+from importlib.metadata import version
 from pathlib import Path
 
 from sqlalchemy import text
@@ -32,7 +33,9 @@ def test_only_core_schema_and_routes(store):
             ).scalars()
         )
     assert tables == {"sessions", "events", "commands", "schema_version"}
-    paths = create_app(Runner(store, Model())).openapi()["paths"]
+    schema = create_app(Runner(store, Model())).openapi()
+    assert schema["info"]["version"] == version("pandita-agent")
+    paths = schema["paths"]
     assert "/v1/sessions" in paths
     assert not any(
         p.startswith(("/v1/authoring", "/v1/operations", "/v1/data-stores"))
