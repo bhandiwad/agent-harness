@@ -32,6 +32,12 @@ def create_app(settings, token_file):
         if not hmac.compare_digest(request.headers.get("authorization", ""), "Bearer " + token):
             raise HTTPException(401, "Worker authentication required.")
 
+    @app.get("/v1/capabilities")
+    async def capabilities(request: Request):
+        authenticate(request)
+        return {"tenant_id": str(settings.tenant_id), "workspace_id": str(settings.workspace_id),
+                "network": "none", "languages": ["python", "javascript"] if "shell" in settings.images else []}
+
     @app.post("/v1/environments")
     async def build_environment(request: Request):
         authenticate(request)

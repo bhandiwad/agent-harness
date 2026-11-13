@@ -76,6 +76,8 @@ def request(model, instructions, messages, tools, previous):
         body["context_management"] = [
             {"type": "compaction", "compact_threshold": model.compact_threshold}
         ]
+    if model.reasoning_effort is not None:
+        body["reasoning"]["effort"] = model.reasoning_effort
     return body
 
 

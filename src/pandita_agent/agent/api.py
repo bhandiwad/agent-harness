@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID, uuid4
@@ -51,7 +52,7 @@ def public_snapshot(row, authorize, user):
 
 
 def create_app(runner):
-    app = FastAPI(title="Pandita generic agent harness", version="0.4.1")
+    app = FastAPI(title="Pandita generic agent harness", version=version("pandita-agent"))
     bearer = HTTPBearer(auto_error=False)
 
     def actor(
